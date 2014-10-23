@@ -53,6 +53,10 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites.Services.WebEntitie
 
         LogEntryType AzureTableTraceLevel { get; set; }
 
+        bool? AzureBlobTraceEnabled { get; set; }
+
+        LogEntryType AzureBlobTraceLevel { get; set; }
+
         ManagedPipelineMode? ManagedPipelineMode { get; set; }
 
         bool? WebSocketsEnabled { get; set; }
@@ -63,7 +67,7 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites.Services.WebEntitie
 
         List<RoutingRule> RoutingRules { get; set; }
 
-        bool ? Use32BitWorkerProcess { get; set; }
+        bool? Use32BitWorkerProcess { get; set; }
     }
 
     public class SiteWithConfig : ISite, ISiteConfig
@@ -75,7 +79,6 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites.Services.WebEntitie
         private DiagnosticsSettings DiagnosticsSettings { get; set; }
 
         public WebsiteInstance[] Instances { get; set; }
-
 
         public SiteWithConfig()
         {
@@ -93,7 +96,7 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites.Services.WebEntitie
             AppSettings = new Hashtable();
             DiagnosticsSettings = new DiagnosticsSettings();
             Instances = new WebsiteInstance[0];
-        
+
             if (SiteConfig.AppSettings != null)
             {
                 foreach (var setting in SiteConfig.AppSettings)
@@ -325,6 +328,18 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites.Services.WebEntitie
         {
             get { return DiagnosticsSettings.AzureTableTraceLevel; }
             set { DiagnosticsSettings.AzureTableTraceLevel = value; }
+        }
+
+        public bool? AzureBlobTraceEnabled
+        {
+            get { return DiagnosticsSettings.AzureBlobTraceEnabled; }
+            set { DiagnosticsSettings.AzureBlobTraceEnabled = value; }
+        }
+
+        public LogEntryType AzureBlobTraceLevel
+        {
+            get { return DiagnosticsSettings.AzureBlobTraceLevel; }
+            set { DiagnosticsSettings.AzureBlobTraceLevel = value; }
         }
 
         public ManagedPipelineMode? ManagedPipelineMode

@@ -28,6 +28,7 @@ using Microsoft.Build.Logging;
 using Microsoft.Web.Deployment;
 using Microsoft.WindowsAzure.Commands.Common;
 using Microsoft.WindowsAzure.Commands.Common.Models;
+using Microsoft.WindowsAzure.Commands.Common.Storage;
 using Microsoft.WindowsAzure.Commands.Utilities.CloudService;
 using Microsoft.WindowsAzure.Commands.Utilities.Common;
 using Microsoft.WindowsAzure.Commands.Utilities.Properties;
@@ -37,6 +38,8 @@ using Microsoft.WindowsAzure.Commands.Utilities.Websites.Services.WebJobs;
 using Microsoft.WindowsAzure.Commands.Websites.WebJobs;
 using Microsoft.WindowsAzure.Management.WebSites;
 using Microsoft.WindowsAzure.Management.WebSites.Models;
+using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.WindowsAzure.WebSitesExtensions;
 using Microsoft.WindowsAzure.WebSitesExtensions.Models;
 using Newtonsoft.Json.Linq;
@@ -157,15 +160,45 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites
                         diagnosticsSettings.AzureTableTraceEnabled = setFlag;
                         if (setFlag)
                         {
-                            const string storageTableName = "CLOUD_STORAGE_ACCOUNT";
                             string storageAccountName = (string)properties[DiagnosticProperties.StorageAccountName];
-                            string connectionString = cloudServiceClient.GetStorageServiceConnectionString(
-                                storageAccountName);
-                            SetConnectionString(website.Name, storageTableName, connectionString, Utilities.DatabaseType.Custom);
+                            string storageTableName = (string)properties[DiagnosticProperties.StorageTableName];
+                            string connectionString = cloudServiceClient.GetStorageServiceConnectionString(storageAccountName);
+
+                            string tableStorageSasUrl =
+                                StorageUtilities.GenerateTableStorageSasUrl(
+                                    connectionString,
+                                    storageTableName,
+                                    DateTime.Now.AddYears(1000),
+                                    SharedAccessTablePermissions.Add | SharedAccessTablePermissions.Query | SharedAccessTablePermissions.Delete | SharedAccessTablePermissions.Update);
+
+                            SetAppSetting(name, "DIAGNOSTICS_AZURETABLESASURL", tableStorageSasUrl);
 
                             diagnosticsSettings.AzureTableTraceLevel = setFlag ?
                                 (Services.DeploymentEntities.LogEntryType)properties[DiagnosticProperties.LogLevel] :
                                 diagnosticsSettings.AzureTableTraceLevel;
+                        }
+                        break;
+
+                    case WebsiteDiagnosticOutput.StorageBlob:
+                        diagnosticsSettings.AzureBlobTraceEnabled = setFlag;
+                        if (setFlag)
+                        {
+                            string storageAccountName = (string)properties[DiagnosticProperties.StorageAccountName];
+                            string storageBlobContainerName = (string)properties[DiagnosticProperties.StorageBlobContainerName];
+                            string connectionString = cloudServiceClient.GetStorageServiceConnectionString(storageAccountName);
+
+                            string blobStorageSasUrl =
+                                StorageUtilities.GenerateBlobStorageSasUrl(
+                                    connectionString,
+                                    storageBlobContainerName,
+                                    DateTime.Now.AddYears(1000),
+                                    SharedAccessBlobPermissions.Delete | SharedAccessBlobPermissions.List | SharedAccessBlobPermissions.Read | SharedAccessBlobPermissions.Write);
+
+                            SetAppSetting(name, "DIAGNOSTICS_AZUREBLOBCONTAINERSASURL", blobStorageSasUrl);
+
+                            diagnosticsSettings.AzureBlobTraceLevel = setFlag ?
+                                (Services.DeploymentEntities.LogEntryType)properties[DiagnosticProperties.LogLevel] :
+                                diagnosticsSettings.AzureBlobTraceLevel;
                         }
                         break;
 
@@ -176,12 +209,15 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites
                 // Check if there is null fields for diagnostics settings. If there is, default to false. (Same as defaulted on portal)
                 diagnosticsSettings.AzureDriveTraceEnabled = diagnosticsSettings.AzureDriveTraceEnabled ?? false;
                 diagnosticsSettings.AzureTableTraceEnabled = diagnosticsSettings.AzureTableTraceEnabled ?? false;
+                diagnosticsSettings.AzureBlobTraceEnabled = diagnosticsSettings.AzureBlobTraceEnabled ?? false;
 
                 JObject json = new JObject(
                     new JProperty(UriElements.AzureDriveTraceEnabled, diagnosticsSettings.AzureDriveTraceEnabled),
                     new JProperty(UriElements.AzureDriveTraceLevel, diagnosticsSettings.AzureDriveTraceLevel.ToString()),
                     new JProperty(UriElements.AzureTableTraceEnabled, diagnosticsSettings.AzureTableTraceEnabled),
-                    new JProperty(UriElements.AzureTableTraceLevel, diagnosticsSettings.AzureTableTraceLevel.ToString()));
+                    new JProperty(UriElements.AzureTableTraceLevel, diagnosticsSettings.AzureTableTraceLevel.ToString()),
+                    new JProperty(UriElements.AzureBlobTraceEnabled, diagnosticsSettings.AzureBlobTraceEnabled),
+                    new JProperty(UriElements.AzureBlobTraceLevel, diagnosticsSettings.AzureBlobTraceLevel.ToString()));
                 client.PostJson(UriElements.DiagnosticsSettings, json, Logger);
             }
         }
@@ -768,7 +804,7 @@ namespace Microsoft.WindowsAzure.Commands.Utilities.Websites
             Utilities.Site website = GetWebsite(name);
             var update = WebsiteManagementClient.WebSites.GetConfiguration(website.WebSpace, website.Name).ToUpdate();
 
-            update.AppSettings[name] = key;
+            update.AppSettings[key] = value;
 
             WebsiteManagementClient.WebSites.UpdateConfiguration(website.WebSpace, website.Name, update);
         }
